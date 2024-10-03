@@ -60,11 +60,14 @@ fi
 
 
 # Extract voxel sizes using fslinfo
+first_session=$(find "${BIDS_DIR}/sub-${SUBJECTS}" -maxdepth 1 -type d -name 'ses-*' | head -n 1)
+
 if [ -n "$(find "${BIDS_DIR}/sub-${SUBJECTS}" -maxdepth 1 -type d -name 'ses-*' -print -quit)" ]; then
-voxel_info=$(singularity exec -B ${BASEDIR}/data/local/bids:/bids containers/qsiprep_0.16.0RC3.simg fslinfo /bids/sub-${SUBJECTS}/ses-01/dwi/*.nii.gz)
+voxel_info=$(singularity exec -B ${BASEDIR}/data/local/bids:/bids -B ${first_session}:/first_session containers/qsiprep_0.16.0RC3.simg fslinfo /first_session/dwi/*.nii.gz)
 else
 voxel_info=$(singularity exec -B ${BASEDIR}/data/local/bids:/bids containers/qsiprep_0.16.0RC3.simg fslinfo /bids/sub-${SUBJECTS}/dwi/*.nii.gz)
 fi
+
 
 # Extract voxel dimensions
 voxdim1=$(echo "$voxel_info" | grep -oP 'pixdim1\s+\K\S+')
