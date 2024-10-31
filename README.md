@@ -70,24 +70,22 @@ Currently this repo is going to be set up for running things on SciNet Niagara c
 
 # The general overview of what to do
 
-
-
 | stage |  #	| Step	|   How Long Does it take to run? 	|
 |---    |---	|---	|---	|
-| stage 0|   0a	|  [Organize your data into BIDS..](#organize-your-data-into-bids) 	|   As long as it takes	|
-|^ |   0b	|  [Deface the BIDS data (if not done during step 1)](#deface-the-bids-data-if-not-done-during-step-1) 	|   	|
-|^ |   0c	|   [Setting up the SciNet environment](#Setting-your-scinet-environment)	| 30 minutes in terminal 	|
-|^ |   0d	|   [Move you bids data to the correct place and add lables to participants.tsv file](#Put-your-bids-data-into-the-datalocal-folder-and-add-lables-to-participantstsv-file)	| depends on time to transfer data to SciNet  	|
-|^ |   0e	|   [Edit fmap files](#Edit-fmap-files)	| 2 minutes in terminal 	|
-|^ |   0f	|   [Final step before running the pipeline](#Final-step-before-running-the-pipeline)	| a few days to get buffer space 	|
+| stage 0|   0a	|  [Setting up the SciNet environment](#Setting-your-scinet-environment)	| 30 minutes in terminal 	|
+|^ |  0b	|  [Organize your data into BIDS](#organize-your-data-into-bids) 	|   As long as it takes	|
+|^ |  0c	|  [Deface the BIDS data (if not done during step 1)](#deface-the-bids-data-if-not-done-during-step-1) 	|   	|
+|^ |  0d	|  [Move you bids data to the correct place and add lables to participants.tsv file](#Put-your-bids-data-into-the-datalocal-folder-and-add-lables-to-participantstsv-file)	| depends on time to transfer data to SciNet | 	
+|^ |   0e	|  [Edit fmap files](#Edit-fmap-files)	| 2 minutes in terminal 	|
+|^ |   0f	|  [Final step before running the pipeline](#Final-step-before-running-the-pipeline)	| a few days to get buffer space 	|
 |stage 1|   01a	|  [Run MRIQC](#Running-mriqc) 	|  8 hours on slurm 	|
 |^|   01b	|  [Run freesurfer](#Running-freesurfer) 	|   23 hours on slurm	|
-|^|   01c	|  [Run fMRIprep fit](#Running-fmriprep-anatomical-includes-freesurfer) 	|   16 hours on slurm	|
-|^ |   01d	|  [Run QSIprep](#Running-qsiprep) 	|   6 hours on slurm	|
-|^ |   01e	|  [Run smriprep](#Running-smriprep) 	|   10 hours on slurm	|
-|stage 2|   02a	|  [Run fMRIprep func](#Submitting-the-fmriprep-func-step) 	|  3 hours of slurm 	|
+|^|   01c	|  [Run fMRIprep fit](#Running-fmriprep-fit-includes-freesurfer) 	|   16 hours on slurm	|
+|^ |  01d	|  [Run QSIprep](#Running-qsiprep) 	|   6 hours on slurm	|
+|^ |  01e	|  [Run smriprep](#Running-smriprep) 	|   10 hours on slurm	|
+|stage 2|   02a	|  [Run fMRIprep apply](#Running-fmriprep-apply) 	|  3 hours of slurm 	|
 |^ |   02b	|  [Run qsirecon step1](#Running-qsirecon-step1) 	|  20 min of slurm 	|
-|^ | 02c | [Run amico noddi](#Running-amico-noddi) | 2 hours of slurm |
+|^ |   02c | [Run amico noddi](#Running-amico-noddi) | 2 hours of slurm |
 |^ |   02d	|  [Run tractography](#Running-tractography) 	|  12 hour of slurm 	|
 |^ |   02e	|  [Run freesurfer group analysis](#Running-freesurfer-group-analysis) 	|  6 hour of slurm 	|
 |^ |   02f	|  [Run ciftify-anat](#Running-ciftify-anat) 	|  3 hours on slurm 	|
@@ -99,18 +97,10 @@ Currently this repo is going to be set up for running things on SciNet Niagara c
 |^ |   05b	|  [Check tsv files](#Check-tsv-files) 	|    	|
 |stage 6 |   06a	|  [Run extract and share to move to data to sharable folder](#Syncing-the-data-with-to-the-share-directory) 	|   30 min in terminal	|
 
-## Organize your data into BIDS
 
-This is the longest - most human intensive - step. But it will make everything else possible! BIDS is really a naming convention for your MRI data that will make it easier for other people in the consortium (as well as the software/ pipeline that you are using) to understand what your data is (e.g. what scan types, how many participants, how many sessions). Converting your data into BIDS may require some renaming and reorganizing. No coding is required, but there are now a lot of different software projects out there to help with the process.
+# Setting your SciNet environment and prepare dataset
 
-For amazing tools and tutorials for learning how to BIDS convert your data, check out the [BIDS starter kit](https://bids-standard.github.io/bids-starter-kit/).
-
-
-## Deface the BIDS data (if not done during step 1)
-
-A useful tool is [this BIDSonym BIDS app](https://peerherholz.github.io/BIDSonym/).
-
-## Setting your SciNet environment
+## Setting Scinet Environment
 
 ### Cloning this Repo
 
@@ -119,12 +109,24 @@ cd $SCRATCH
 git clone https://github.com/TIGRLab/SCanD_project.git
 ```
 
-## Run the software set-up script
+### Run the software set-up script
 
 ```sh
 cd ${SCRATCH}/SCanD_project
 source code/00_setup_data_directories.sh
 ```
+
+## Organize your data into BIDS
+
+This is the longest - most human intensive - step. But it will make everything else possible! BIDS is really a naming convention for your MRI data that will make it easier for other people in the consortium (as well as the software/ pipeline that you are using) to understand what your data is (e.g. what scan types, how many participants, how many sessions). Converting your data into BIDS may require some renaming and reorganizing. No coding is required, but there are now a lot of different software projects out there to help with the process.
+
+For amazing tools and tutorials for learning how to BIDS convert your data, check out the [BIDS starter kit](https://bids-standard.github.io/bids-starter-kit/).
+
+
+### Deface the BIDS data (if not done during step 1)
+
+A useful tool is [this BIDSonym BIDS app](https://peerherholz.github.io/BIDSonym/).
+
 
 ### Put your bids data into the data/local folder and add labels to participants.tsv file
 
@@ -133,19 +135,8 @@ We want to put your data into:
 ```
 ./data/local/bids
 ```
-After organizing the bids folder, proceed to populate the participant labels, such as 'sub-CMH0047' within the 'ScanD_project/data/local/bids/participants.tsv' file. First row should be "participany id" and then you have all the subject ids in the other rows.
-
-Also, make sure dataset_description.json exists inside your bids folder.
-
-#### For a test run of the code
-
-For a test run of this available code you can work with a test dataset from open neuro - [check out the appendix for add the code to download test data](#appendix---adding-a-test-dataset-from-openneuro) . 
-
-#### Your own data - continue from here
-
 You can do this by either copying "scp -r", linking `ln -s` or moving the data to this place - it's your choice.
-
-**If you are copying data from another computer or server, you should use the SciNet datamover (dm) node, not the login node!**
+If you are copying data from another computer or server, you should use the SciNet datamover (dm) node, not the login node!
 
 To switch into the dm node: 
 ```sh
@@ -159,7 +150,12 @@ To link existing data from another location on SciNet Niagara to this folder:
 ```sh
 ln -s /your/data/on/scinet/bids ${SCRATCH}/SCanD_project/data/local/bids
 ```
-## Edit fmap files
+
+After organizing the bids folder, proceed to populate the participant labels, such as 'sub-CMH0047' within the 'ScanD_project/data/local/bids/participants.tsv' file. First row should be "participany id" and then you have all the subject ids in the other rows.
+
+Also, make sure dataset_description.json exists inside your bids folder.
+
+### Edit fmap files
 
 In some cases dcm2niix conversion fails to add "IntendedFor" in the fmap files which causes errors in fmriprep_func step. Therefore, we need to edit fmap file in the bids folder and add "intendedFor"s. In order to edit these files we need to run a python code.
 
@@ -188,6 +184,7 @@ In case you want to backup your json files before editing them:
 mkdir bidsbackup_json
 rsync -zarv  --include "*/" --include="*.json" --exclude="*"  data/local/bids  bidsbackup_json
 ```
+
 ## Final step before running the pipeline
 
 The working directory for pipelines is based on the $BBUFFER environment variable, which assumes access to the buffer space. This setup significantly enhances code execution speed and overall performance.
@@ -204,12 +201,15 @@ Let us know if you can get me access, any help would be greatly appreciated!
 ```
 If BBUFFER space is unavailable or you choose not to use it, you need to navigate through each pipeline code and replace all instances of $BBUFFER with $SCRATCH/SCanD_project.
 
-## Quick Start - Workflow Automation
+
+# Quick Start - Workflow Automation
 
 After setting up the scinet environment and organizing your BIDS folder and `participants.csv` file, instead of running each pipeline separately, you can run the codes for each stage simultaneously. For a streamlined approach to running pipelines by stages, please refer to the [Quick start workflow automation.md](Quick_start_workflow_automation.md) document and proceed accordingly. Otherwise, run pipelines separately.
 
 * Note: if you are running xcp-d pipeline (stage 3) for the first time, just make sure to run the codes to download the templateflow files before running the automated codes. You can find these codes below in [xcp-d](#Running-xcp-d) section.
 
+
+# Running Pipelines and sharing results
 
 ## Running mriqc
 
@@ -253,15 +253,7 @@ echo "number of array is: ${array_job_length}"
 sbatch --array=0-${array_job_length} ./code/01_freesurfer_long_scinet.sh
 ```
 
-## Running fmriprep anatomical (includes freesurfer)
-
-Note: this step uses and estimated **6hrs for processing time** per participant! So if all participants run at once (in our parallel cluster) it will still take a day to run.
-
-#### Potential changes to script for your data
- 
-Most of the time the anatomical data includes the skull, but _sometimes_ people decide to share data where skull stripping has already happened. If you data is **already skull stripped** than you need to add another flag `--skull-strip-t1w force` to the script `./code/01_fmriprep_fit_scinet.sh`
-
-Running the functional step looks pretty similar to running the anat step. The time taken and resources needed will depend on how many functional tasks exists in the experiment - fMRIprep will try to run these in paralell if resources are available to do that.
+## Running fmriprep fit (includes freesurfer)
 
 Note -  the script enclosed uses some interesting extra options:
  - it defaults to running all the fmri tasks - the `--task-id` flag can be used to filter from there
@@ -326,10 +318,7 @@ echo "number of array is: ${array_job_length}"
 sbatch --array=0-${array_job_length} ./code/01_smriprep_scinet.sh
 ```
 
-
-## Submitting the fmriprep func step 
-
-Running the functional step looks pretty similar to running the anat step. The time taken and resources needed will depend on how many functional tasks exists in the experiment - fMRIprep will try to run these in paralell if resources are available to do that.
+## Running fmriprep apply 
 
 Note -  the script enclosed uses some interesting extra options:
  - it defaults to running all the fmri tasks - the `--task-id` flag can be used to filter from there
@@ -485,7 +474,6 @@ echo "number of array is: ${array_job_length}"
 sbatch --array=0-${array_job_length} ./code/02_tractography_single_scinet.sh
 
 ```
-
 
 ## Running ciftify-anat
 
@@ -688,11 +676,13 @@ cp -r data/share  /scratch/a/arisvoin/arisvoin/mlepage/your_group_name/
 
 # Appendix - Adding a test dataset from openneuro
 
-#### (To test this repo - using an openneuro dataset)
+## For a test run of the code
+
+For a test run of this available code you can work with a test dataset from open neuro. 
 
 To get an openneuro dataset for testing - we will use datalad
 
-##### Loading datalad on SciNet Niagara
+### Loading datalad on SciNet Niagara
 
 ```sh
 ## loading Erin's datalad environment on the SciNet system
@@ -700,23 +690,19 @@ module load git-annex/8.20200618 # git annex is needed by datalad
 source /project/a/arisvoin/edickie/modules/datalad/0.15.5/build/bin/activate
 ```
 
-##### Downloading OpenNeuro dataset through datalad
+### Downloading OpenNeuro dataset through datalad
 
 ```
 cd ${SCRATCH}/SCanD_project/data/local/
 datalad clone https://github.com/OpenNeuroDatasets/ds000115.git bids
 ```
 
-Before running fmriprep anat, we need to fetch the anatomical T1W scans 
+### Before running fmriprep, we need to fetch the anatomical T1W scans and download the fmri scans:
+
 
 ```
 cd bids
 datalad get sub*/anat/*T1w.nii.gz
-```
-Before running fmriprep func - we need to download the fmri scans
-
-```
-cd bids
 datalad get sub*/func/*
 ```
 
