@@ -3,3 +3,5 @@ logs/*
 data/*
 work/*
 templates/.cache/
+code/glm/__pycache__
+code/glm/.ipynb_checkpoints/
