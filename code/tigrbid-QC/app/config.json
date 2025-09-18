@@ -1,0 +1,14 @@
+{
+    "freesurfer": {
+        "version": "7.4.1",
+        "metrics_file": "group_euler.tsv",
+        "metrics_cols": ["EulerNumber"],
+        "visual_glob": "/derivatives/freesurfer/sub-*/figures/sub-*_desc-reconall_T1w.svg"
+    },
+    "fmriprep": {
+        "version": "23.2.3",
+        "metrics_file": "group_fmriprep_fd.tsv",
+        "metrics_cols": ["FD_mean", "DVARS_mean"],
+        "visual_glob": "/derivatives/fmriprep/sub-*/figures/sub-*_bold_qc.svg"
+    }
+}
