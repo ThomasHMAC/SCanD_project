@@ -1,7 +1,8 @@
 # %%
-
 import math
 import os
+import pickle
+from argparse import ArgumentParser
 from datetime import datetime
 from glob import glob
 from pathlib import Path
@@ -9,24 +10,61 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 from models import MetricQC, QCRecord
-from PIL import Image
+from session_persistance import load_session_state, save_session_state
 from streamlit_scroll_to_top import scroll_to_here
 
+
+def parse_args(args=None):
+    parser = ArgumentParser("Freesurfer QC")
+
+    parser.add_argument(
+        "--fs_metric",
+        dest="freesurfer_metric",
+        help="Group Euler CSV file",
+        required=True,
+    )
+
+    parser.add_argument(
+        "--fmri_dir",
+        help=(
+            "The root directory of fMRI preprocessing derivatives. "
+            "For example, /SCanD_project/data/local/derivatives/fmriprep/23.2.3."
+        ),
+        required=True,
+    )
+
+    parser.add_argument(
+        "--output_dir",
+        dest="out_dir",
+        help="Directory to save session state and QC results",
+        required=True,
+    )
+    return parser.parse_args(args)
+
+
+args = parse_args()
+fs_metric = args.freesurfer_metric
+fmri_dir = args.fmri_dir
+out_dir = args.out_dir
+SESSION_STATE_FILE = Path(out_dir) / "session_state.pkl"
+
+# To `keep` the value when switching page
 for k, v in st.session_state.items():
     st.session_state[k] = v
 
+# Read metrics and filter for ses-01
 freesurfer_metrics = pd.read_csv(
-    "/projects/ttan/tmp_test/SCanD_project/data/local/derivatives/freesurfer/7.4.1/00_group2_stats_tables/euler.tsv",
+    fs_metric,
     sep="\t",
 )
+# Need to adapt the code so it work when there is no ses-01 in the subject column of the dataframe
+if freesurfer_metrics["subject"].str.contains("ses-01").any():
 
-fmriprep_derivative = (
-    "/projects/ttan/tmp_test/SCanD_project/data/local/derivatives/fmriprep/23.2.3"
-)
-
-reconall_svgs = sorted(
-    glob(f"{fmriprep_derivative}/sub-*/figures/sub-*_desc-reconall_T1w.svg")
-)
+    filtered_fs_metrics = freesurfer_metrics[
+        freesurfer_metrics["subject"].str.contains("ses-01")
+    ]
+else:
+    filtered_fs_metrics = freesurfer_metrics
 
 
 def scroll():
@@ -41,9 +79,14 @@ st.title("Freesurfer QC")
 rater_name = st.text_input("Rater name:")
 # Show the value dynamically
 st.write("You entered:", rater_name)
-rater_name = "Thomas"
 
 # Session State Initialization
+
+st.set_page_config(layout="wide")
+if "initialized" not in st.session_state:
+    load_session_state(SESSION_STATE_FILE)
+    st.session_state.initialized = True
+
 if "metrics" not in st.session_state:
     st.session_state.metrics = []
 
@@ -69,32 +112,31 @@ if "scroll_to_top" not in st.session_state:
 if "qc_records" not in st.session_state:
     st.session_state.qc_records = {}
 
-# Calculate current batch ONCE with correct indices
+# Pagination
+total_rows = len(filtered_fs_metrics)
+# Compute batch
 start_idx = (st.session_state.current_page - 1) * st.session_state.batch_size
-end_idx = min(start_idx + st.session_state.batch_size, len(reconall_svgs))
-# Ensure we don't exceed list length
-current_batch = reconall_svgs[start_idx:end_idx]
+end_idx = min(start_idx + st.session_state.batch_size, total_rows)
+current_batch = filtered_fs_metrics.iloc[start_idx:end_idx]
 
-# Debug info (remove in production)
-st.write(
-    f"You currently on : Page {st.session_state.current_page}, Batch size {st.session_state.batch_size}, Start {start_idx}, End {end_idx}, Total images {len(reconall_svgs)}"
-)
-svg_path = current_batch[0]
-# Go through the batch of images
-for svg_path in current_batch:
-    base_svg = os.path.basename(svg_path)
-    parts = base_svg.split("_")
+for _, row in current_batch.iterrows():
+    subj = row["subject"]
+    parts = subj.split("_")
     sub_id = parts[0].split("-")[1]
-    ses_id = next((p for p in parts if p.startswith("ses-")), None)
-    if ses_id:
-        ses_num = ses_id.split("-")[1]
-    else:
-        ses_id = "ses-01"
-        ses_num = ses_id.split("-")[1]
-    run_id = next((p for p in parts if p.startswith("run-")), None)
-    log_file = Path(
-        f"{fmriprep_derivative}/sourcedata/freesurfer/sub-{sub_id}/scripts/recon-all-status.log"
+    ses_id = parts[1] if len(parts) > 1 else "ses-01"
+    ses_num = ses_id.split("-")[1] if "-" in ses_id else ses_id
+    run_id = None
+
+    # Optional: find reconall SVG
+    svg_matches = glob(
+        f"{fmri_dir}/sub-{sub_id}/figures/sub-{sub_id}_*desc-reconall_T1w.svg"
     )
+    svg_path = svg_matches[0] if svg_matches else None
+    # Get recon-all timestamp
+    log_file = Path(
+        f"{fmri_dir}/sourcedata/freesurfer/sub-{sub_id}/scripts/recon-all-status.log"
+    )
+    complete_time = None
     if log_file.is_file():
         lines = log_file.read_text().splitlines()
         last_line = lines[-1]
@@ -105,36 +147,37 @@ for svg_path in current_batch:
             )
             format_data = "%b %d %H:%M:%S %Y"
             complete_time = datetime.strptime(finished_str_no_tz, format_data)
-            formatted_date = complete_time.strftime("%m-%d-%Y %H:%M:%S.%f")
+            formatted_date = complete_time.strftime("%m-%d-%Y")
     else:
-        complete_time = None
-        st.error(f"Log file not found for subject {sub_id}.")
+        st.warning(f"Log file not found for subject {sub_id}.")
 
     st.header(f"Subject {sub_id} Session {ses_num}")
 
-    # Extract Euler metric (numeric)
-    filtered = freesurfer_metrics[
-        (freesurfer_metrics["subject"].str.contains(f"sub-{sub_id}"))
-        & (freesurfer_metrics["subject"].str.contains(f"{ses_id}"))
-    ]
-    row = filtered.squeeze() if not filtered.empty else None
-    l_euler_val = row.get("lh_euler") if row is not None else None
-    r_euler_val = row.get("rh_euler") if row is not None else None
-    euler_vals = {"Left": l_euler_val, "Right": r_euler_val}
-
-    # Clear metrics per subject
+    # metrics per subject
     subject_metrics = []
 
+    # Euler metrics
+    euler_vals = {"Left": row.get("lh_euler"), "Right": row.get("rh_euler")}
     for hemi, val in euler_vals.items():
         euler_key = f"{sub_id}_euler_{hemi}"
+        options = ("PASS", "FAIL", "UNCERTAIN")
+
+        if val < -150 or val > 0:
+            default_index = options.index("FAIL")
+        elif -150 <= val <= 0:
+            default_index = options.index("PASS")
+        else:
+            default_index = None
         st.markdown(f"<h4>{hemi} Euler value: {val}</h4>", unsafe_allow_html=True)
+
         st.radio(
             "",
-            options=("PASS", "FAIL", "UNCERTAIN"),
+            options=options,
             key=euler_key,
             label_visibility="collapsed",
-            index=None,
+            index=default_index,
         )
+
         qc_choice = st.session_state.get(euler_key)
         metric = MetricQC(name=f"Euler_{hemi}", value=val, qc=qc_choice)
 
@@ -145,9 +188,14 @@ for svg_path in current_batch:
         ):
             subject_metrics.append(metric)
 
-    # Segmentation SVG (visual)
-    st.image(svg_path, width="stretch")
-    st.markdown(f"<h4> Surface Segmentation QC", unsafe_allow_html=True)
+    # Segmentation SVG
+    with st.container():
+        if svg_path is not None and os.path.exists(svg_path):
+            st.image(svg_path, use_container_width=True)
+            # st.image(svg_path, width="stretch")
+        else:
+            st.warning(f"Image not found: {svg_path}")
+        st.markdown(f"<h4> Surface Segmentation QC", unsafe_allow_html=True)
     seg_qc = st.radio(
         "",
         ("PASS", "FAIL", "UNCERTAIN"),
@@ -156,10 +204,11 @@ for svg_path in current_batch:
         index=None,
     )
     metric = MetricQC(name="surface_segmentation", qc=seg_qc)
+
     if not any(m.name == metric.name for m in st.session_state.metrics):
         subject_metrics.append(metric)
 
-    # Other manual fields
+    # Require rerun
     require_rerun = st.radio(
         f"Require rerun?", ("YES", "NO"), key=f"{sub_id}_rerun", index=None
     )
@@ -169,9 +218,10 @@ for svg_path in current_batch:
     else:
         final_qc = "FAIL" if require_rerun == "YES" else "PASS"
 
+    # Notes
     notes = st.text_input(f"***NOTES***", key=f"{sub_id}_notes")
+    subject_metrics.append(MetricQC(name="QC_notes", notes=notes))
 
-    # Create a metric for notes
     metric_notes = MetricQC(name="QC_notes", notes=notes)
     if not any(m.name == metric_notes.name for m in st.session_state.metrics):
         subject_metrics.append(metric_notes)
@@ -188,6 +238,7 @@ for svg_path in current_batch:
         final_qc=final_qc,
         metrics=subject_metrics,
     )
+
 # Pagination Controls - MOVED TO TOP
 bottom_menu = st.columns((1, 2, 1))
 
@@ -210,8 +261,7 @@ with bottom_menu[2]:
         st.rerun()
 
 # Calculate total pages with current batch size
-total_pages = max(1, math.ceil(len(reconall_svgs) / st.session_state.batch_size))
-
+total_pages = max(1, math.ceil(total_rows / st.session_state.batch_size))
 # Navigation controls
 with bottom_menu[1]:
     col1, col2, col3 = st.columns([1, 1, 1], gap="small")
@@ -232,6 +282,7 @@ with bottom_menu[1]:
     # Update current page if changed
     if new_page != st.session_state.current_page:
         st.session_state.current_page = new_page
+        st.rerun()
 
     if col3.button("➡️"):
         if st.session_state.current_page < total_pages:
@@ -244,8 +295,12 @@ with bottom_menu[0]:
 st.button("Scroll to Top", on_click=scroll)
 
 # Save to CSV
+now = datetime.now()
+timestamp = now.strftime("%Y%m%d")  # e.g., 20250917
+out_file = Path(out_dir) / f"qc_results_{timestamp}.csv"
+
 if st.button("Save QC results to CSV"):
-    out_file = Path("/projects/ttan/tmp_test/qc_results.csv")
+    save_session_state()
     out_file.parent.mkdir(exist_ok=True, parents=True)
 
     # Flatten metrics dynamically for CSV
@@ -271,13 +326,12 @@ if st.button("Save QC results to CSV"):
                 "require_rerun": rec.require_rerun,
                 "rater": rec.rater,
                 "final_qc": rec.final_qc,
-                "notes": next(
-                    (m.notes for m in rec.metrics if m.name == "QC_notes"), None
-                ),
+                "notes": next((m.notes for m in rec.metrics if m.name == "QC_notes")),
             }
         )
         rows.append(row)
 
     df = pd.DataFrame(rows)
     pd.DataFrame(rows).to_csv(out_file, index=False)
+
     st.success(f"QC results saved to {out_file}")
